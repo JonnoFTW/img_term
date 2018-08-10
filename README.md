@@ -20,3 +20,13 @@ Render your video capture device to terminal:
 ```bash
 ./img_term.py
 ```
+
+Example
+-
+Go from this:
+
+![Dog](/dog.jpg)
+
+To this:
+
+![Screenshot](/screenshot.png)
