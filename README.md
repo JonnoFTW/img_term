@@ -33,4 +33,4 @@ To this:
 
 Or simply stream your USB camera to terminal!:
 
-[Screen](/RemarkablePalatableKob.webm)
+![Screen](/RemarkablePalatableKob.webm)
