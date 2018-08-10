@@ -33,4 +33,4 @@ To this:
 
 Or simply stream your USB camera to terminal!:
 
-![Screen](https://gfycat.com/RemarkablePalatableKob)
+![Screen](https://giant.gfycat.com/RemarkablePalatableKob.webm)
