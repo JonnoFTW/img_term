@@ -30,3 +30,7 @@ Go from this:
 To this:
 
 ![Screenshot](/screenshot.png)
+
+Or simply stream your USB camera to terminal!:
+
+![Screen](https://gfycat.com/RemarkablePalatableKob)
