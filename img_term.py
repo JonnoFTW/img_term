@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import math
+
+import cv2
 import numba
 import numpy as np
-import cv2
 from numba import prange, njit
 
 mem = {}
@@ -75,12 +76,29 @@ cols_bgr = np.empty((256, 3), dtype=np.int64)
 for x, y in cols:
     cols_bgr[x] = y[::-1]
 
+cols_4bit_items = {30: (1, 1, 1),
+                   31: (222, 56, 43),
+                   32: (57, 181, 74),
+                   33: (255, 199, 6),
+                   34: (0, 111, 184),
+                   35: (118, 38, 113),
+                   36: (44, 181, 233),
+                   37: (204, 204, 204),
+                   90: (128, 128, 128),
+                   91: (255, 0, 0),
+                   92: (0, 255, 0),
+                   93: (255, 255, 0),
+                   94: (0, 0, 255),
+                   95: (255, 0, 255),
+                   96: (0, 255, 255),
+                   97: (255, 255, 255)}.items()
 
-def closest_col(pxl):
+
+def closest_col(pxl, palette=cols_bgr):
     tpl = tuple(pxl)
     if tpl in mem:
         return mem[tpl]
-    out = str(np.argmin(dists(cols_bgr, pxl)))
+    out = str(np.argmin(dists(palette, pxl)))
     mem[tpl] = out
     return out
 
@@ -93,7 +111,7 @@ def dists(col_map, pxl):
     return dists
 
 
-@numba.jit()
+@numba.njit(fastmath=True)
 def col_dist(a, b):
     r = (a[0] + b[0]) / 2
     dr = np.power(a[0] - b[0], 2)
@@ -102,7 +120,7 @@ def col_dist(a, b):
     return np.sqrt(2 * dr + 4 * dg + 3 * db + ((r * (dr - db)) / 256))
 
 
-@numba.jit()
+@numba.njit(fastmath=True)
 def col_dist2(a, b):
     dr = math.pow(a[0] - b[0], 2)
     dg = math.pow(a[1] - b[1], 2)
@@ -110,7 +128,49 @@ def col_dist2(a, b):
     return math.sqrt(2 * dr + 4 * dg + 3 * db)
 
 
-def img(input_img, height, width):
+def closest_col_4bit(pxl):
+    tpl = tuple(pxl)
+    if tpl in mem:
+        return mem[tpl]
+    out = min(cols_4bit_items, key=lambda x: col_dist(pxl, x[1][::-1]))[0]
+    mem[tpl] = out
+    return out
+
+
+def img_4bit(input_img, height, width):
+    out = []
+    input_img = input_img.astype(np.int64)
+    for y in range(height // 2):
+        y2 = 2 * y
+        for _x in range(width):
+            top_pxl = input_img[y2, _x]
+            bot_pxl = input_img[y2 + 1, _x]
+            # get the closest colour to the pixel
+            top_col = closest_col_4bit(top_pxl)
+            bot_col = closest_col_4bit(bot_pxl)
+            out.append(''.join(("\x1B[", str(top_col), ";", str(bot_col + 10), "m▀")))
+        out.append('\n')
+    return ''.join(out)
+
+
+def img_24bit(input_img, height, width):
+    # 48 chars per pixel pair
+    # out = np.empty((height * width + 1), dtype=np.object)
+    out = []
+    for y in range(height // 2):
+        y2 = 2 * y
+        for x in range(width):
+            top_pxl = input_img[y2, x]
+            bot_pxl = input_img[y2 + 1, x]
+            # Render the colour directly
+            out.append(
+                "\x1B[38;2;" + str(top_pxl[2]) + ';' + str(top_pxl[1]) + ';' + str(top_pxl[0]) + "m\x1B[48;2;" + str(
+                    bot_pxl[2]) + ';' + str(bot_pxl[1]) + ';' + str(bot_pxl[0]) + "m▀")
+        out.append('\n')
+    return ''.join(out)
+
+
+def img_8bit(input_img, height, width):
     out = []
     input_img = input_img.astype(np.int64)
     for y in range(height // 2):
@@ -118,13 +178,13 @@ def img(input_img, height, width):
         for x in range(width):
             top_pxl = input_img[y2, x]
             bot_pxl = input_img[y2 + 1, x]
-            # get the closest ansi colour to this pixel
+            # get the closest colour to the pixel
             top_col = closest_col(top_pxl)
             bot_col = closest_col(bot_pxl)
-            out.append(''.join(("\x1B[38;5;", top_col, ";48;5;", bot_col, "m▀\x1B[0m")))
+            out.append(''.join(("\x1B[38;5;", top_col, ";48;5;", bot_col, "m▀")))
         out.append('\n')
-    print("\x1b[;H")
-    print(''.join(out))
+    return ''.join(out)
+
 
 
 def fast_setup():
@@ -168,6 +228,7 @@ def fast_setup():
 
 
 def img_fast(input_img, height, width, func, queue, ctx, g_lut):
+    import pyopencl as cl
     g_img = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=input_img)
     out = np.zeros((width * height, 4), cl.cltypes.ushort)
     g_out = cl.Buffer(ctx, cl.mem_flags.WRITE_ONLY, out.nbytes)
@@ -184,15 +245,26 @@ def get_new_size(my_w, pxls):
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
+    parser = argparse.ArgumentParser(description='Display image to terminal')
+    parser.add_argument('-img', help='Image file to display', default=None)
+    parser.add_argument('-width', default=78, help='Character width of output')
+    parser.add_argument('-cam', help='Show camera, this is the default')
+    parser.add_argument('-col', help='Colour scheme to use', choices=[4, 8, 24], default=8, type=int)
+    args = parser.parse_args()
+    fname = args.img
     # print("\x1b[2J")
+    func = {4: img_4bit, 8: img_8bit, 24: img_24bit}[args.col]
+    print("\x1b[2J")
     my_width = 78
-    if len(sys.argv) == 2:
-        image = cv2.imread(sys.argv[1])
+    if fname:
+        image = cv2.imread(fname)
         new_size = get_new_size(my_width, image)
         image = cv2.resize(src=image, dsize=new_size)
-        img(image, new_size[1], new_size[0])
+        chars = func(image, new_size[1], new_size[0])
+        print("\x1b[;H", chars, '\x1b[0m', sep='')
+
     else:
         cam = cv2.VideoCapture(0)
 
@@ -206,7 +278,7 @@ if __name__ == "__main__":
             try:
                 retval, image = cam.read()
                 image = cv2.resize(src=image, dsize=new_size)
-                img(image, new_size[1], new_size[0])
+                print("\x1b[;H", func(image, new_size[1], new_size[0]), '\x1B[0m', sep='')
                 count += 1
             except KeyboardInterrupt:
                 print("FPS:", count / (time() - start_time))
