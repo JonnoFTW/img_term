@@ -51,7 +51,9 @@ To this:
 ![Screenshot](/screenshot.png)
 
 
-Or this[Lenna](/lena.jpg)
+Or this
+
+![Lenna](/lena.jpg)
 
 To this:
 
