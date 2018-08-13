@@ -249,15 +249,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Display image to terminal')
     parser.add_argument('-img', help='Image file to display', default=None)
-    parser.add_argument('-width', default=78, help='Character width of output')
+    parser.add_argument('-width', default=78, help='Character width of output', type=int)
     parser.add_argument('-cam', help='Show camera, this is the default')
     parser.add_argument('-col', help='Colour scheme to use', choices=[4, 8, 24], default=8, type=int)
     args = parser.parse_args()
     fname = args.img
     # print("\x1b[2J")
     func = {4: img_4bit, 8: img_8bit, 24: img_24bit}[args.col]
-    print("\x1b[2J")
-    my_width = 78
+    # print("\x1b[2J")
+    my_width = args.width
     if fname:
         image = cv2.imread(fname)
         new_size = get_new_size(my_width, image)

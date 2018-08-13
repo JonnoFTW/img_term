@@ -50,6 +50,13 @@ To this:
 
 ![Screenshot](/screenshot.png)
 
+
+Or this[Lenna](/lena.jpg)
+
+To this:
+
+![LenaPixel](/screenshot2.png)
+
 Or simply stream your USB camera to terminal!:
 
 ![Screen](/RemarkablePalatableKob.webm)
