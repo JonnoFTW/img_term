@@ -186,7 +186,6 @@ def img_8bit(input_img, height, width):
     return ''.join(out)
 
 
-
 def fast_setup():
     import pyopencl as cl
     import pyopencl.cltypes
@@ -240,7 +239,7 @@ def img_fast(input_img, height, width, func, queue, ctx, g_lut):
 
 def get_new_size(my_w, pxls):
     wpercent = (my_width / float(pxls.shape[0]))
-    hsize = int((float(pxls.shape[1]) * float(wpercent)))
+    hsize = int((float(pxls.shape[1]) * float(wpercent)) * 2)
     return my_w, hsize
 
 
@@ -250,11 +249,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Display image to terminal')
     parser.add_argument('-img', help='Image file to display', default=None)
     parser.add_argument('-width', default=78, help='Character width of output', type=int)
-    parser.add_argument('-cam', help='Show camera, this is the default')
+    parser.add_argument('-vid', help='Show video, default is usb camera', default='')
     parser.add_argument('-col', help='Colour scheme to use', choices=[4, 8, 24], default=8, type=int)
     args = parser.parse_args()
     fname = args.img
-    # print("\x1b[2J")
+    print("\x1b[2J")
     func = {4: img_4bit, 8: img_8bit, 24: img_24bit}[args.col]
     # print("\x1b[2J")
     my_width = args.width
@@ -266,7 +265,10 @@ if __name__ == "__main__":
         print("\x1b[;H", chars, '\x1b[0m', sep='')
 
     else:
-        cam = cv2.VideoCapture(0)
+        if args.vid == '':
+            cam = cv2.VideoCapture(0)
+        else:
+            cam = cv2.VideoCapture(args.vid)
 
         from time import time
 
@@ -275,11 +277,15 @@ if __name__ == "__main__":
         retval, image = cam.read()
         new_size = get_new_size(my_width, image)
         while 1:
+            if not cam.isOpened():
+                break
             try:
                 retval, image = cam.read()
                 image = cv2.resize(src=image, dsize=new_size)
                 print("\x1b[;H", func(image, new_size[1], new_size[0]), '\x1B[0m', sep='')
+                print("FPS:", count / (time() - start_time))
                 count += 1
+
             except KeyboardInterrupt:
                 print("FPS:", count / (time() - start_time))
                 break

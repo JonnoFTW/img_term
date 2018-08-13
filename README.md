@@ -59,6 +59,14 @@ To this:
 
 ![LenaPixel](/screenshot2.png)
 
+Or even render a video:
+
+```bash
+./img_term.py -col 24 -vid unrealset.mkv -width 78
+```
+
+https://gfycat.com/IdolizedSomeGemsbuck
+
 Or simply stream your USB camera to terminal!:
 
 ![Screen](/RemarkablePalatableKob.webm)
