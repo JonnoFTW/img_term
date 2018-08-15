@@ -238,8 +238,8 @@ def img_fast(input_img, height, width, func, queue, ctx, g_lut):
 
 
 def get_new_size(my_w, pxls):
-    wpercent = (my_width / float(pxls.shape[0]))
-    hsize = int((float(pxls.shape[1]) * float(wpercent)) * 2)
+    r = (my_w / float(pxls.shape[1]))
+    hsize = int(pxls.shape[0] * r)
     return my_w, hsize
 
 
