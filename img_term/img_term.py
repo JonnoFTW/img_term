@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import math
-
+from plasma import Plasma
 import cv2
 import numba
 import numpy as np
+import subprocess
 from numba import prange, njit
+from time import time
 
 mem = {}
 cols = {0: (0, 0, 0), 1: (128, 0, 0), 2: (0, 128, 0), 3: (128, 128, 0), 4: (0, 0, 128), 5: (128, 0, 128),
@@ -157,7 +159,7 @@ def img_24bit(input_img, height, width):
     # 48 chars per pixel pair
     # out = np.empty((height * width + 1), dtype=np.object)
     out = []
-    for y in range(height // 2):
+    for y in range(height//2):
         y2 = 2 * y
         for x in range(width):
             top_pxl = input_img[y2, x]
@@ -186,55 +188,65 @@ def img_8bit(input_img, height, width):
     return ''.join(out)
 
 
-def fast_setup():
+def fast_setup(colour_map_items):
     import pyopencl as cl
+    import pyopencl.array
     import pyopencl.cltypes
 
     device = cl.get_platforms()[0].get_devices()[0]
     ctx = cl.Context([device])
-    lut = np.zeros(256, cl.cltypes.char3)
-    for idx, col in cols_bgr:
-        lut[idx][0] = col[0]
+    cols = len(colour_map_items)
+    lut_idx = np.zeros(cols, cl.cltypes.ushort)
+    lut = np.zeros(cols, cl.cltypes.int3)
+    for idx, col in enumerate(colour_map_items):
+        lidx, col = col
+        lut[idx][2] = col[0]
         lut[idx][1] = col[1]
-        lut[idx][2] = col[2]
+        lut[idx][0] = col[2]
+        lut_idx[idx] = lidx
+    g_lut_idx = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=lut_idx)
     g_lut = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=lut)
     krnl = """
-    __kernel void closest(__global uchar4 *img,
+    __kernel void closest(const __global uchar *img,
                           __global ushort *out,
-                          __constant uchar4 *lut,
-                          ushort const cols) {
-        int x = get_global_id(0);
-        int height = get_global_size(0);
-        int width = get_global_size(1);
-        int y = get_global_id(1);
-        int index = y * height + x;
-        float dmin = 99999;
+                          __constant int3 *lut,
+                          __constant ushort *lut_idx) {
+        const int x = get_global_id(1);
+        const int y = get_global_id(0);
+        const int width = get_global_size(1);
+        const int height = get_global_size(0);
+        const int index = (y*width*3) + (x*3);
+        int dmin = INT_MAX;
         int h = -1;
-        for(int i = 0; i < cols; i++) {
-            float d = hypot(img[index], lut[i]);
+        const int3 p = (int3)(img[index], img[index+1],img[index+2]); 
+        int d;
+        int3 lut_col;
+        int3 diff;
+        for(int i = 0; i < ${cols}; i++) {
+            diff = p - lut[i];
+            diff = diff*diff;
+            d = diff.x+diff.y+diff.z;
             if(d < dmin) {
                 dmin = d;
-                h = i
+                h = i;
             }
         }
-        out[index] = h;
+        out[y*width + x] = lut_idx[h];
     }
-    """
+    """.replace('${cols}', str(cols))
     prog = cl.Program(ctx, krnl).build()
     func = prog.closest
     queue = cl.CommandQueue(ctx)
-    return func, queue, ctx, g_lut
+    return cl, func, queue, ctx, g_lut, g_lut_idx
 
 
-def img_fast(input_img, height, width, func, queue, ctx, g_lut):
-    import pyopencl as cl
-    g_img = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=input_img)
-    out = np.zeros((width * height, 4), cl.cltypes.ushort)
+def img_fast(cl, img, height, width, func, queue, ctx, g_lut, g_lut_idx):
+    g_img = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=img)
+    out = np.empty((height * width), cl.cltypes.ushort)
     g_out = cl.Buffer(ctx, cl.mem_flags.WRITE_ONLY, out.nbytes)
-    func(queue, (height, width), None, g_img, g_out, g_lut, 256)
-
-    cl.enqueue_copy(queue, out, g_out).wait()
-    return img.reshape((width, height, 4))[:, :, :3]
+    ev = func(queue, (height, width), None, g_img, g_out, g_lut, g_lut_idx)
+    cl.enqueue_copy(queue, out, g_out, wait_for=[ev]).wait()
+    return out.reshape((width, height))
 
 
 def get_new_size(my_w, pxls):
@@ -242,25 +254,65 @@ def get_new_size(my_w, pxls):
     hsize = int(pxls.shape[0] * r)
     return my_w, hsize
 
-
-if __name__ == "__main__":
+def main():
     import argparse
-
+    import os
+    os.system('')
     parser = argparse.ArgumentParser(description='Display image to terminal')
     parser.add_argument('-img', help='Image file to display', default=None)
+    parser.add_argument('-plasma', action='store_true')
     parser.add_argument('-width', default=78, help='Character width of output', type=int)
     parser.add_argument('-vid', help='Show video, default is usb camera', default='')
     parser.add_argument('-col', help='Colour scheme to use', choices=[4, 8, 24], default=8, type=int)
+    parser.add_argument('-cl', help='Use opencl', action='store_true')
     args = parser.parse_args()
     fname = args.img
-    print("\x1b[2J")
-    func = {4: img_4bit, 8: img_8bit, 24: img_24bit}[args.col]
-    # print("\x1b[2J")
     my_width = args.width
+    print("\x1b[2J")
+    if args.plasma:
+        rows, columns = [int(x.decode('ascii')) for x in subprocess.check_output(['stty', 'size']).split()]
+        plasma_gen = Plasma(rows, columns)
+        count = 0
+        start_time = time()
+        while 1:
+            print("\x1b[;H", img_24bit(plasma_gen(), rows, columns), '\x1B[0m', sep='')
+            print("FPS:", count / (time() - start_time))
+            count += 1
+
+    if args.cl:
+        lut = {4: cols_4bit_items, 8: cols}[args.col]
+        cl, cl_func, queue, ctx, g_lut, g_lut_idx = fast_setup(lut)
+
+
+        # g_img_a = {'img': None}
+
+        def func(img, height, width):
+            # if g_img_a['img'] is None:
+            #     g_img_a['img'] = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, img.nbytes)
+            # cl.enqueue_copy(queue, g_img_a['img'], img).wait()
+            mapped = img_fast(cl, img, height, width, cl_func, queue, ctx, g_lut, g_lut_idx)
+
+            out = []
+            for y in range(height // 2):
+                y2 = 2 * y
+                for x in range(width):
+                    top_pxl = str(mapped[y2, x])
+                    bot_pxl = str(mapped[y2 + 1, x])
+                    out.append(''.join(("\x1B[38;5;", top_pxl, ";48;5;", bot_pxl, "m▀")))
+                out.append('\n')
+            return ''.join(out)
+
+    else:
+        func = {4: img_4bit, 8: img_8bit, 24: img_24bit}[args.col]
+    # print("\x1b[2J")
+
     if fname:
         image = cv2.imread(fname)
         new_size = get_new_size(my_width, image)
         image = cv2.resize(src=image, dsize=new_size)
+        # import matplotlib.pyplot as plt
+        # plt.imshow(image[:,:,::-1])
+        # plt.show()
         chars = func(image, new_size[1], new_size[0])
         print("\x1b[;H", chars, '\x1b[0m', sep='')
 
@@ -269,8 +321,6 @@ if __name__ == "__main__":
             cam = cv2.VideoCapture(0)
         else:
             cam = cv2.VideoCapture(args.vid)
-
-        from time import time
 
         start_time = time()
         count = 0
@@ -281,6 +331,8 @@ if __name__ == "__main__":
                 break
             try:
                 retval, image = cam.read()
+                if retval != 1:
+                    break
                 image = cv2.resize(src=image, dsize=new_size)
                 print("\x1b[;H", func(image, new_size[1], new_size[0]), '\x1B[0m', sep='')
                 print("FPS:", count / (time() - start_time))
@@ -290,3 +342,6 @@ if __name__ == "__main__":
                 print("FPS:", count / (time() - start_time))
                 break
         cam.release()
+
+if __name__ == "__main__":
+    main()

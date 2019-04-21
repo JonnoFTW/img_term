@@ -4,16 +4,16 @@ Converts an image to a representation in ANSI
 
 Installation
 -
-1. Copy the repository
-2. Run:
+1. 
 ```bash
-pip install opencv-python numba numpy
+pip install img_term
 ```
+
 Usage
 -
 
 ```
-usage: img_term.py [-h] [-img IMG] [-width WIDTH] [-cam CAM] [-col {4,8,24}]
+usage: img_term [-h] [-img IMG] [-width WIDTH] [-cam CAM] [-col {4,8,24}]
 
 Display image to terminal
 
@@ -27,11 +27,12 @@ optional arguments:
 
 Display an image in terminal 
 ```bash
-./img_term.py -img dog.jpg 
+img_term -img dog.jpg 
 ```
+
 Render your video capture device to terminal:
 ```bash
-./img_term.py
+img_term
 ```
 
 Select a colour palette:
@@ -69,4 +70,4 @@ https://gfycat.com/IdolizedSomeGemsbuck
 
 Or simply stream your USB camera to terminal!:
 
-![Screen](/RemarkablePalatableKob.webm)
+https://gfycat.com/RemarkablePalatableKob
