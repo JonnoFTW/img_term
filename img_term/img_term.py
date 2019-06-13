@@ -307,6 +307,8 @@ def main():
     # print("\x1b[2J")
 
     if fname:
+        if not os.path.exists(fname):
+            exit("{} does not exist".format(fname))
         image = cv2.imread(fname)
         new_size = get_new_size(my_width, image)
         image = cv2.resize(src=image, dsize=new_size)
@@ -325,6 +327,8 @@ def main():
         start_time = time()
         count = 0
         retval, image = cam.read()
+        if not retval:
+            exit("Error retrieving camera")
         new_size = get_new_size(my_width, image)
         while 1:
             if not cam.isOpened():

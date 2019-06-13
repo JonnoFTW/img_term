@@ -13,7 +13,7 @@ requirements = ['numba','numpy','opencv-python']
 
 setup(
     name='img_term',  # Required
-    version='1.0.0',  # Required
+    version='1.0.2',  # Required
     description='A small script to render images to an ANSI terminal',  # Optional
     long_description=long_description,  # Optional
     long_description_content_type='text/markdown',  # Optional (see note above)
@@ -30,13 +30,6 @@ setup(
     keywords='terminal ansi fun',  # Optional
     packages=['img_term'],  # Required
     install_requires=requirements,
-    # To provide executable scripts, use entry points in preference to the
-    # "scripts" keyword. Entry points provide cross-platform support and allow
-    # `pip` to create the appropriate form of executable for the target
-    # platform.
-    #
-    # For example, the following would provide a command called `sample` which
-    # executes the function `main` from this package when invoked:
     entry_points={  # Optional
         'console_scripts': [
             'img_term = img_term.img_term:main',
