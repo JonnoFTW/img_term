@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import math
-from plasma import Plasma
+#from plasma import Plasma
 import cv2
 import numba
 import numpy as np

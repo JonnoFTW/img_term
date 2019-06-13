@@ -1,1 +1,0 @@
-from .img_term import main

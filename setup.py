@@ -10,7 +10,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 requirements = ['numba','numpy','opencv-python']
-    
+
 setup(
     name='img_term',  # Required
     version='1.0.0',  # Required
@@ -18,7 +18,7 @@ setup(
     long_description=long_description,  # Optional
     long_description_content_type='text/markdown',  # Optional (see note above)
     url='https://github.com/jonnoFTW/img_term',  # Optional
-    author='Jonathan Mackenzie', 
+    author='Jonathan Mackenzie',
     classifiers=[  # Optional
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
@@ -28,7 +28,7 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     keywords='terminal ansi fun',  # Optional
-    packages=find_packages('img_term'),  # Required
+    packages=['img_term'],  # Required
     install_requires=requirements,
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
@@ -39,7 +39,7 @@ setup(
     # executes the function `main` from this package when invoked:
     entry_points={  # Optional
         'console_scripts': [
-            'img_term=img_term:main',
+            'img_term = img_term.img_term:main',
         ],
     },
     project_urls={  # Optional
